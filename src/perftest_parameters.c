@@ -3150,9 +3150,14 @@ void print_report_lat (struct perftest_parameters *user_param)
 	}
 
 	if (user_param->tst == LAT) {
+		/*
+		 * HACK!
+		 * This is for pointer chasing calculation
+		 */
 		for (i = 0; i < measure_cnt; ++i) {
 			delta[i] = user_param->tposted[i + 1] - user_param->tposted[i];
 		}
+
 	} else if (user_param->tst == LAT_BY_BW) {
 		for (i = 0; i < measure_cnt; ++i) {
 			delta[i] = user_param->tcompleted[i] - user_param->tposted[i];

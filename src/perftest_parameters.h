@@ -512,6 +512,13 @@ struct perftest_parameters {
 	void 				(*print_eth_func)(void*);
 	int				disable_pcir;
 	struct counter_context		*counter_ctx;
+
+	/*
+	 * HACK!
+	 * Added for Pointer Chasing code.
+	 */
+	int				enable_ptr_chase;
+	int				nr_ptr_chase;
 };
 
 struct report_options {

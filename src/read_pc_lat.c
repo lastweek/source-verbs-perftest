@@ -262,15 +262,31 @@ int main(int argc, char *argv[])
 
 	ctx_set_send_wqes(&ctx,&user_param,rem_dest);
 
+	/*
+	 * HACK!
+	 *
+	 * 1) 
+	 * Well. it's confusing.
+	 * For read, the tool is reportin the RTT time.
+	 * But for send, it is one-way latency.
+	 *
+	 * 2) Let's always do 8B read.
+	 *    But tune the nr_chase time.
+	 */
 	if (user_param.test_method == RUN_ALL) {
-		for (i = 1; i < 24 ; ++i) {
-			user_param.size = (uint64_t)1 << i;
+		for (i = 0; i < 24; ++i) {
+			user_param.size = 8;
+			user_param.enable_ptr_chase = 1;
+			user_param.nr_ptr_chase = 1 << i;
+
 			if(run_iter_lat(&ctx,&user_param))
 				return 17;
 
+			printf("[%s:%s()] nr_chase=%d\n", __FILE__, __func__, user_param.nr_ptr_chase);
 			user_param.test_type == ITERATIONS ? print_report_lat(&user_param) : print_report_lat_duration(&user_param);
 		}
 	} else {
+		user_param.size = 8;
 		if(run_iter_lat(&ctx,&user_param))
 			return 18;
 

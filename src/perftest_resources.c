@@ -3968,7 +3968,10 @@ int run_iter_lat(struct pingpong_context *ctx,struct perftest_parameters *user_p
 		else
 			catch_alarm(0);
 	}
+
 	while (scnt < user_param->iters || (user_param->test_type == DURATION && user_param->state != END_STATE)) {
+		int nr_chase;
+
 		if (user_param->latency_gap) {
 			start_gap = get_cycles();
 			end_cycle = start_gap + total_gap_cycles;
@@ -3976,42 +3979,72 @@ int run_iter_lat(struct pingpong_context *ctx,struct perftest_parameters *user_p
 				continue;
 			}
 		}
-		if (user_param->test_type == ITERATIONS)
+
+		if (user_param->test_type == ITERATIONS) {
+			/*
+			 * HACK!
+			 * Use ns.
+			 */
+#if 0
 			user_param->tposted[scnt++] = get_cycles();
-
-		err = post_send_method(ctx, 0, user_param);
-
-		if (err) {
-			fprintf(stderr,"Couldn't post send: scnt=%lu\n",scnt);
-			return 1;
+#else
+			{
+				struct timespec ts;
+				clock_gettime(CLOCK_MONOTONIC, &ts);
+				user_param->tposted[scnt++] = ts.tv_sec * 1e9 + ts.tv_nsec;
+			}
+#endif
 		}
 
-		if (user_param->test_type == DURATION && user_param->state == END_STATE)
-			break;
+		/*
+		 * HACK
+		 *
+		 * nr_ptr_chase meant the extra RTT we need to take.
+		 * If nr_ptr_chase 0, it equals to one RTT.
+		 */
+		if (user_param->enable_ptr_chase)
+			nr_chase = 1 + user_param->nr_ptr_chase;
+		else
+			nr_chase = 1;
 
-		if (user_param->use_event) {
-			if (ctx_notify_events(ctx->channel)) {
-				fprintf(stderr, "Couldn't request CQ notification\n");
+#if 0
+		printf("[%s:%s()] nr_chase=%d scnt=%ld\n",
+			__FILE__, __func__, nr_chase, scnt);
+#endif
+
+		while (nr_chase--) {
+			err = post_send_method(ctx, 0, user_param);
+			if (err) {
+				fprintf(stderr,"Couldn't post send: scnt=%lu\n",scnt);
 				return 1;
 			}
-		}
 
-		do {
-			ne = ibv_poll_cq(ctx->send_cq, 1, &wc);
-			if(ne > 0) {
-				if (wc.status != IBV_WC_SUCCESS) {
-					NOTIFY_COMP_ERROR_SEND(wc,scnt,scnt);
+			if (user_param->test_type == DURATION && user_param->state == END_STATE)
+				break;
+
+			if (user_param->use_event) {
+				if (ctx_notify_events(ctx->channel)) {
+					fprintf(stderr, "Couldn't request CQ notification\n");
 					return 1;
 				}
-				if (user_param->test_type==DURATION && user_param->state == SAMPLE_STATE)
-					user_param->iters++;
-
-			} else if (ne < 0) {
-				fprintf(stderr, "poll CQ failed %d\n", ne);
-				return FAILURE;
 			}
 
-		} while (!user_param->use_event && ne == 0);
+			do {
+				ne = ibv_poll_cq(ctx->send_cq, 1, &wc);
+				if(ne > 0) {
+					if (wc.status != IBV_WC_SUCCESS) {
+						NOTIFY_COMP_ERROR_SEND(wc,scnt,scnt);
+						return 1;
+					}
+					if (user_param->test_type==DURATION && user_param->state == SAMPLE_STATE)
+						user_param->iters++;
+
+				} else if (ne < 0) {
+					fprintf(stderr, "poll CQ failed %d\n", ne);
+					return FAILURE;
+				}
+			} while (!user_param->use_event && ne == 0);
+		}
 	}
 
 	return 0;
