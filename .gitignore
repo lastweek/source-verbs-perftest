@@ -52,6 +52,9 @@ raw_ethernet_lat
 raw_ethernet_burst_lat
 raw_ethernet_fs_rate
 
+ib_read_pc_lat
+ib_send_pc_lat
+
 #Debian Stuff
 debian/compat
 debian/*.log
